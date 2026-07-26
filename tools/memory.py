@@ -5,7 +5,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import numpy as np
 from pydantic import BaseModel, Field, ValidationError
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from app import mcp
 from orion_config import MEMORY_FILE
@@ -21,6 +24,10 @@ class MemoryEntry(BaseModel):
     decision: str
     tags: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def _entry_text(entry: MemoryEntry) -> str:
+    return f"{entry.topic} {' '.join(entry.tags)} {entry.decision}"
 
 
 def _load_entries() -> list[MemoryEntry]:
@@ -57,6 +64,14 @@ def _save_entries(entries: list[MemoryEntry]) -> None:
     except OSError as exc:
         logger.error("Failed to write memory file: %s", exc)
         raise
+
+
+def _format_entry(entry: MemoryEntry, score: Optional[float] = None) -> str:
+    tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
+    prefix = f"#{entry.id} | {entry.topic}{tags_str}"
+    if score is not None:
+        prefix = f"#{entry.id} [{score:.2f}] | {entry.topic}{tags_str}"
+    return f"{prefix}\n   {entry.decision}\n"
 
 
 @mcp.tool(
@@ -103,42 +118,117 @@ def remember_decision(
     },
 )
 def recall_context(query: str, limit: int = 5) -> str:
-    """Search past decisions and context by keyword.
+    """Search past decisions using TF-IDF semantic ranking.
+
+    Ranks entries by cosine similarity between the query and the full
+    text of each memory (topic + tags + decision).
 
     Args:
-        query: Keywords to search for in topics, decisions, and tags.
+        query: Search query. Can be a keyword, phrase, or question.
         limit: Maximum number of results to return (default 5).
     """
     entries = _load_entries()
     if not entries:
         return "No memories stored yet."
 
-    query_lower = query.lower()
-    query_words = query_lower.split()
+    corpus = [_entry_text(e) for e in entries]
+    vectorizer = TfidfVectorizer(stop_words=None, lowercase=True)
+    tfidf_matrix = vectorizer.fit_transform(corpus)
+    query_vec = vectorizer.transform([query])
 
-    scored: list[tuple[int, MemoryEntry]] = []
-    for entry in entries:
-        text = (
-            f"{entry.topic.lower()} "
-            f"{entry.decision.lower()} "
-            f"{' '.join(entry.tags).lower()}"
-        )
-        score = sum(1 for word in query_words if word in text)
-        if score > 0:
-            scored.append((score, entry))
+    similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    results = scored[:limit]
+    scored = [(float(similarities[i]), entries[i]) for i in np.argsort(-similarities)]
+    results = [(s, e) for s, e in scored if s > 0][:limit]
 
     if not results:
         return f"No memories found matching: {query}"
 
-    lines: list[str] = []
-    for score, entry in results:
+    return "\n".join(_format_entry(e, s) for s, e in results)
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": False,
+    },
+)
+def revise_decision(
+    id: int,
+    topic: Optional[str] = None,
+    decision: Optional[str] = None,
+    tags: Optional[str] = None,
+) -> str:
+    """Update an existing decision. Only provided fields are changed.
+
+    Args:
+        id: The numeric ID of the decision to update.
+        topic: New topic for this decision (leave empty to keep current).
+        decision: New decision text (leave empty to keep current).
+        tags: New comma-separated tags (leave empty to keep current).
+    """
+    entries = _load_entries()
+
+    for entry in entries:
+        if entry.id == id:
+            if topic is not None:
+                entry.topic = topic.strip()
+            if decision is not None:
+                entry.decision = decision.strip()
+            if tags is not None:
+                entry.tags = [t.strip() for t in tags.split(",") if t.strip()]
+
+            _save_entries(entries)
+            logger.info("Revised decision #%d", id)
+            return f"Revised decision #{id}: {entry.topic}"
+
+    return f"Decision #{id} not found. Use browse_memories to see all entries."
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": False,
+        "destructiveHint": True,
+    },
+)
+def forget_decision(id: int) -> str:
+    """Permanently delete a decision by its ID.
+
+    Args:
+        id: The numeric ID of the decision to delete.
+    """
+    entries = _load_entries()
+
+    for i, entry in enumerate(entries):
+        if entry.id == id:
+            topic = entry.topic
+            entries.pop(i)
+            _save_entries(entries)
+            logger.info("Forgot decision #%d: %s", id, topic)
+            return f"Forgot decision #{id}: {topic}"
+
+    return f"Decision #{id} not found. Use browse_memories to see all entries."
+
+
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+    },
+)
+def browse_memories() -> str:
+    """List all stored decisions with their IDs, topics, and tags.
+
+    Use this to see what's in memory before revising or forgetting.
+    """
+    entries = _load_entries()
+    if not entries:
+        return "No memories stored yet."
+
+    lines = [f"{len(entries)} memories stored:\n"]
+    for entry in entries:
         tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
-        lines.append(
-            f"#{entry.id} | {entry.topic}{tags_str}\n"
-            f"   {entry.decision}\n"
-        )
+        lines.append(f"  #{entry.id} | {entry.topic}{tags_str}")
 
     return "\n".join(lines)

@@ -9,4 +9,4 @@ mcp = FastMCP(
     "recall_context to search past decisions by keyword.",
 )
 
-from tools import memory  # noqa: E402, F401 — triggers @mcp.tool() decorators
+from tools import memory, whoami  # noqa: E402, F401

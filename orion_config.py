@@ -11,5 +11,6 @@ logging.basicConfig(
 
 DATA_DIR = Path(__file__).parent / "data"
 MEMORY_FILE = DATA_DIR / "memory.json"
+WHOAMI_FILE = DATA_DIR / "whoami.json"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
