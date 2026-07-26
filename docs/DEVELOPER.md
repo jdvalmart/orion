@@ -50,9 +50,22 @@ Every module must be documented at the top with a docstring explaining its purpo
 - `logs/` — runtime diagnostics. Gitignored. Rotated via `RotatingFileHandler`.
 - `orion_config.py` — paths, constants, logging setup. No business logic.
 
-## 8. Documentation files
+## 8. Session workflow
+
+Every session must follow this pattern to maintain context across restarts:
+
+**At the START of every session:**
+1. Read `docs/SESSION_CONTEXT.md` (injected automatically by opencode `instructions` config).
+2. Call `recall_session` via Orion to get the accumulated master context and recent history.
+
+**At the END of every session:**
+1. Call `remember_session` with a concise summary of what was accomplished.
+2. Update `docs/SESSION_CONTEXT.md` to reflect the new phase, tool count, and next steps.
+
+## 9. Documentation files
 
 - `README.md` — public: install, usage, connection guide.
 - `docs/ACTA.md` — single internal document: founding context, architecture, roadmap, work rules, git workflow.
 - `docs/DEVELOPER.md` — this file. AI assistant work rules.
+- `docs/SESSION_CONTEXT.md` — injected each session. Updated at session end.
 - No new `.md` files without explicit approval.
