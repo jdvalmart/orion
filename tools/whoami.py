@@ -12,13 +12,17 @@ from orion_config import WHOAMI_FILE
 logger = logging.getLogger(__name__)
 
 
-class Education(BaseModel):
+class EducationEntry(BaseModel):
+    """An academic degree or certification."""
+
     degree: str
     institution: str
     year: str | int
 
 
-class Work(BaseModel):
+class CurrentWork(BaseModel):
+    """Current job details."""
+
     role: str
     company: str
     area: str
@@ -26,7 +30,9 @@ class Work(BaseModel):
     stack: list[str] = Field(default_factory=list)
 
 
-class Skills(BaseModel):
+class SkillCategories(BaseModel):
+    """Grouped technical skills."""
+
     machine_learning: list[str] = Field(default_factory=list)
     deep_learning: list[str] = Field(default_factory=list)
     nlp: list[str] = Field(default_factory=list)
@@ -37,7 +43,9 @@ class Skills(BaseModel):
     frameworks: list[str] = Field(default_factory=list)
 
 
-class Project(BaseModel):
+class ProjectEntry(BaseModel):
+    """A personal or professional project."""
+
     name: str
     description: str
     stack: list[str] = Field(default_factory=list)
@@ -45,6 +53,8 @@ class Project(BaseModel):
 
 
 class Profile(BaseModel):
+    """Juan's professional profile — validated on load."""
+
     name: str
     role: str
     company: str
@@ -53,15 +63,15 @@ class Profile(BaseModel):
     area: str
     specialization: str
     summary: str
-    work: dict = Field(default_factory=dict)
-    education: list[Education] = Field(default_factory=list)
-    skills: Optional[Skills] = None
-    projects: list[Project] = Field(default_factory=list)
+    work: dict[str, CurrentWork] = Field(default_factory=dict)
+    education: list[EducationEntry] = Field(default_factory=list)
+    skills: Optional[SkillCategories] = None
+    projects: list[ProjectEntry] = Field(default_factory=list)
     learning_goals: list[str] = Field(default_factory=list)
 
 
 def _load_profile() -> Profile:
-    """Load the whoami profile from disk."""
+    """Load and validate the whoami profile from disk."""
     try:
         with open(WHOAMI_FILE, "r") as f:
             raw = json.load(f)
@@ -76,37 +86,52 @@ def _load_profile() -> Profile:
         raise
 
 
-def _format_education(education: list[Education]) -> str:
+def _format_work(current: Optional[CurrentWork]) -> str:
+    """Format current job section."""
+    if not current:
+        return ""
+    return (
+        f"  {current.role} at {current.company} ({current.area})\n"
+        f"  {current.description}\n"
+        f"  Daily stack: {', '.join(current.stack)}\n"
+    )
+
+
+def _format_education(entries: list[EducationEntry]) -> str:
+    """Format education section as bullet list."""
     lines = []
-    for edu in education:
+    for edu in entries:
         lines.append(f"  - {edu.degree} — {edu.institution} ({edu.year})")
     return "\n".join(lines)
 
 
-def _format_skills(skills: Optional[Skills]) -> str:
+def _format_skills(skills: Optional[SkillCategories]) -> str:
+    """Format skills section grouped by category."""
     if not skills:
         return ""
     lines = []
-    for category in [
-        ("ML Clásico", skills.machine_learning),
+    categories = [
+        ("Classical ML", skills.machine_learning),
         ("Deep Learning", skills.deep_learning),
         ("NLP", skills.nlp),
         ("XAI", skills.xai),
-        ("Sistemas Distribuidos", skills.distributed),
+        ("Distributed Systems", skills.distributed),
         ("Deployment", skills.deployment),
-    ]:
-        if category[1]:
-            lines.append(f"  {category[0]}: {', '.join(category[1])}")
+    ]
+    for label, items in categories:
+        if items:
+            lines.append(f"  {label}: {', '.join(items)}")
     if skills.languages:
-        lines.append(f"  Lenguajes: {', '.join(skills.languages)}")
+        lines.append(f"  Languages: {', '.join(skills.languages)}")
     if skills.frameworks:
         lines.append(f"  Frameworks: {', '.join(skills.frameworks)}")
     return "\n".join(lines)
 
 
-def _format_projects(projects: list[Project]) -> str:
+def _format_projects(entries: list[ProjectEntry]) -> str:
+    """Format projects section."""
     lines = []
-    for p in projects:
+    for p in entries:
         repo_str = f" ({p.repo})" if p.repo else ""
         lines.append(f"  - {p.name}: {p.description}{repo_str}")
         lines.append(f"    Stack: {', '.join(p.stack)}")
@@ -131,16 +156,7 @@ def whoami() -> str:
     except Exception:
         return "Unable to load profile. Check that whoami.json exists and is valid JSON."
 
-    current = profile.work.get("current", {})
-    work_desc = ""
-    if current:
-        work_desc = (
-            f"  {current.get('role', '')} en {current.get('company', '')} "
-            f"({current.get('area', '')})\n"
-            f"  {current.get('description', '')}\n"
-            f"  Stack diario: {', '.join(current.get('stack', []))}\n"
-        )
-
+    work_desc = _format_work(profile.work.get("current"))
     education = _format_education(profile.education)
     skills = _format_skills(profile.skills)
     projects = _format_projects(profile.projects)
@@ -149,24 +165,24 @@ def whoami() -> str:
     return (
         f"# {profile.name}\n"
         f"\n"
-        f"**{profile.role}** en **{profile.company}** — {profile.location}\n"
-        f"Desde: {profile.since}\n"
-        f"Área: {profile.area}\n"
-        f"Especialización: {profile.specialization}\n"
+        f"**{profile.role}** at **{profile.company}** — {profile.location}\n"
+        f"Since: {profile.since}\n"
+        f"Area: {profile.area}\n"
+        f"Specialization: {profile.specialization}\n"
         f"\n"
         f"{profile.summary}\n"
         f"\n"
-        f"## Trabajo actual\n"
+        f"## Current work\n"
         f"{work_desc}\n"
-        f"## Formación\n"
+        f"## Education\n"
         f"{education}\n"
         f"\n"
-        f"## Habilidades\n"
+        f"## Skills\n"
         f"{skills}\n"
         f"\n"
-        f"## Proyectos personales\n"
+        f"## Personal projects\n"
         f"{projects}\n"
         f"\n"
-        f"## Aprendiendo\n"
+        f"## Learning\n"
         f"{goals}\n"
     )

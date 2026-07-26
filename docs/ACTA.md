@@ -145,14 +145,20 @@ orion/
 ├── app.py                 # FastMCP instance + tool registration
 ├── tools/
 │   ├── __init__.py
-│   └── memory.py          # remember_decision, recall_context
-├── orion_config.py        # Paths, defaults, logging setup
+│   ├── memory.py          # remember, recall, revise, forget, browse
+│   └── whoami.py          # personal profile tool
+├── orion_config.py        # Paths, constants, logging setup
 ├── data/                  # Gitignored, persistent storage
-│   └── memory.json        # Flat JSON decision store
-├── requirements.txt       # fastmcp, pydantic
+│   ├── memory.json        # Flat JSON decision store
+│   └── whoami.json        # Juan's profile
+├── logs/                  # Gitignored, runtime diagnostics
+│   ├── orion.log          # Full log (rotated, 1 MB)
+│   └── errors.log         # Warnings and errors (rotated, 1 MB)
+├── requirements.txt       # fastmcp, pydantic, scikit-learn
 ├── README.md              # Public documentation
 ├── docs/
-│   └── ACTA.md            # This document — founding act + roadmap + rules
+│   ├── ACTA.md            # This document — founding act + roadmap + rules
+│   └── DEVELOPER.md       # AI assistant work rules
 └── .gitignore
 ```
 
@@ -167,7 +173,11 @@ En el trabajo usamos HTTP para multi-usuario. Orion es single-user local pero ma
 | Tool | Input | Output | Lógica |
 |------|-------|--------|--------|
 | `remember_decision` | topic, decision, tags (opt) | Confirmación | Guarda en data/memory.json con timestamp. JSON plano. |
-| `recall_context` | query | Top-N decisiones | Búsqueda por keywords. Fase 2 migra a RAG con embeddings. |
+| `recall_context` | query | Top-N decisiones | TF-IDF + cosine similarity. Ranking semántico real. |
+| `revise_decision` | id, fields (opt) | Confirmación | Modifica campos de una decisión existente. |
+| `forget_decision` | id | Confirmación | Elimina permanentemente por ID. |
+| `browse_memories` | — | Lista completa | Lista IDs, topics y tags de todas las decisiones. |
+| `whoami` | — | Perfil completo | Perfil profesional estructurado desde data/whoami.json. |
 
 ### Decisiones de diseño
 

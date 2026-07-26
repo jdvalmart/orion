@@ -61,8 +61,12 @@ Then connect any HTTP-compatible client to `http://localhost:9099/mcp`.
 
 | Tool | Description |
 |------|------------|
-| `remember_decision` | Store an architectural decision or context with topic, decision, and optional tags |
-| `recall_context` | Search past decisions by keyword match |
+| `remember_decision` | Store an architectural decision with topic, decision, and optional tags |
+| `recall_context` | Search past decisions using TF-IDF semantic ranking |
+| `revise_decision` | Update an existing decision's fields |
+| `forget_decision` | Permanently delete a decision by ID |
+| `browse_memories` | List all stored decisions |
+| `whoami` | Return Juan's professional profile and context |
 
 ## Structure
 
@@ -72,11 +76,14 @@ orion/
 ├── app.py              # FastMCP instance + tool registration
 ├── tools/
 │   ├── __init__.py
-│   └── memory.py       # remember_decision, recall_context
-├── orion_config.py     # Paths, defaults, logging setup
+│   ├── memory.py       # remember, recall, revise, forget, browse
+│   └── whoami.py       # personal profile tool
+├── orion_config.py     # Paths, constants, logging setup
 ├── data/               # Persistent storage (gitignored)
+├── logs/               # Runtime diagnostics (gitignored)
 ├── docs/
-│   └── ACTA.md         # Founding act, roadmap, and work rules
+│   ├── ACTA.md         # Founding act, roadmap, and work rules
+│   └── DEVELOPER.md    # AI assistant work rules
 ├── requirements.txt
 └── .gitignore
 ```

@@ -30,23 +30,29 @@ Never run `git commit`, `git add`, `git push`, or any repository mutation. Only 
 
 ## 5. Code conventions
 
-- Code, docstrings, and commit messages in English.
+- **Everything in English.** Code, docstrings, log messages, tool output labels, UI strings, and commit messages. The only exception is data stored in JSON files, which may reflect the user's language.
 - Type hints on every function signature.
-- Pydantic models for domain data. No raw `dict` for persistent entities.
+- Pydantic models for domain data. No raw `dict` for persistent entities that have a known schema.
 - `logging` with levels — never `print()`.
 - No unnecessary comments. The code explains itself; comments explain *why*, not *what*.
-- FastMCP tools use the `@mcp.tool()` decorator, not the wrapper pattern.
+- FastMCP tools use the `@mcp.tool()` decorator — never the `register_tools(mcp)` wrapper pattern.
 
-## 6. Architecture boundaries
+## 6. Documentation standards
 
-- `app.py` — FastMCP instance only. Tool imports have a side-effect of registering tools via decorators.
+Every module must be documented at the top with a docstring explaining its purpose. Every Pydantic model must have a docstring. Every tool must document all parameters using Google-style Args docstrings. There are no exceptions — undocumented code is unfinished code.
+
+## 7. Architecture boundaries
+
+- `app.py` — FastMCP instance only. Tool imports trigger `@mcp.tool()` decorator side-effects.
 - `server.py` — CLI entrypoint only. `argparse` + `mcp.run()`.
 - `tools/` — tool implementations. One file per tool group. Imports `mcp` from `app`.
 - `data/` — persistent storage. Gitignored. JSON flat files in Phase 1.
+- `logs/` — runtime diagnostics. Gitignored. Rotated via `RotatingFileHandler`.
 - `orion_config.py` — paths, constants, logging setup. No business logic.
 
-## 7. Documentation
+## 8. Documentation files
 
 - `README.md` — public: install, usage, connection guide.
 - `docs/ACTA.md` — single internal document: founding context, architecture, roadmap, work rules, git workflow.
+- `docs/DEVELOPER.md` — this file. AI assistant work rules.
 - No new `.md` files without explicit approval.

@@ -7,6 +7,9 @@ venv/
 # Data (persistent storage)
 data/
 
+# Logs (runtime diagnostics)
+logs/
+
 # OpenCode config (personal, not part of the project)
 .opencode/
 
