@@ -11,4 +11,4 @@ mcp = FastMCP(
     "browse_memories to list everything, and whoami for Juan's profile.",
 )
 
-from tools import memory, whoami  # noqa: E402, F401
+from tools import memory, whoami, graph  # noqa: E402, F401

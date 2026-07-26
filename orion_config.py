@@ -8,6 +8,7 @@ DATA_DIR = Path(__file__).parent / "data"
 LOGS_DIR = Path(__file__).parent / "logs"
 MEMORY_FILE = DATA_DIR / "memory.json"
 WHOAMI_FILE = DATA_DIR / "whoami.json"
+GRAPH_FILE = DATA_DIR / "graph.json"
 CHROMA_PATH = DATA_DIR / "chroma_db"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
