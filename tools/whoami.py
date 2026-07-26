@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -49,7 +48,7 @@ class ProjectEntry(BaseModel):
     name: str
     description: str
     stack: list[str] = Field(default_factory=list)
-    repo: Optional[str] = None
+    repo: str | None = None
 
 
 class Profile(BaseModel):
@@ -65,7 +64,7 @@ class Profile(BaseModel):
     summary: str
     work: dict[str, CurrentWork] = Field(default_factory=dict)
     education: list[EducationEntry] = Field(default_factory=list)
-    skills: Optional[SkillCategories] = None
+    skills: SkillCategories | None = None
     projects: list[ProjectEntry] = Field(default_factory=list)
     learning_goals: list[str] = Field(default_factory=list)
 
@@ -73,7 +72,7 @@ class Profile(BaseModel):
 def _load_profile() -> Profile:
     """Load and validate the whoami profile from disk."""
     try:
-        with open(WHOAMI_FILE, "r") as f:
+        with open(WHOAMI_FILE) as f:
             raw = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to read whoami profile: %s", exc)
@@ -86,7 +85,7 @@ def _load_profile() -> Profile:
         raise
 
 
-def _format_work(current: Optional[CurrentWork]) -> str:
+def _format_work(current: CurrentWork | None) -> str:
     """Format current job section."""
     if not current:
         return ""
@@ -105,7 +104,7 @@ def _format_education(entries: list[EducationEntry]) -> str:
     return "\n".join(lines)
 
 
-def _format_skills(skills: Optional[SkillCategories]) -> str:
+def _format_skills(skills: SkillCategories | None) -> str:
     """Format skills section grouped by category."""
     if not skills:
         return ""
@@ -153,7 +152,7 @@ def whoami() -> str:
     """
     try:
         profile = _load_profile()
-    except Exception:
+    except (OSError, ValidationError):
         return "Unable to load profile. Check that whoami.json exists and is valid JSON."
 
     work_desc = _format_work(profile.work.get("current"))

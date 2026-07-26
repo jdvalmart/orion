@@ -14,4 +14,4 @@ mcp = FastMCP(
     "remember_session at the end to maintain context across sessions.",
 )
 
-from tools import memory, whoami, graph, session  # noqa: E402, F401
+from tools import graph, memory, session, whoami  # noqa: F401, E402 — decorator side-effects

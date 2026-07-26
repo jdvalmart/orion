@@ -5,13 +5,13 @@ Update it at the end of each session.
 
 ## Current Status
 
-- **Phase**: Fase 4 — Session Memory (IN PROGRESS)
+- **Phase**: Fase 4 — Session Memory (DONE)
 - **Phase 1**: Foundation — 6 memory tools + whoami (DONE)
 - **Phase 2**: RAG — ChromaDB ONNX embeddings (DONE)
 - **Phase 3**: Knowledge Graph — link, find, browse (DONE)
-- **Phase 4**: Session Memory — hybrid architecture (NOW)
+- **Phase 4**: Session Memory — hybrid architecture (DONE)
 - **Total tools**: 12
-- **Next**: Telescopium (test suite)
+- **Next**: Lupus (test suite) — already bootstrapped, 36 tests, 5 layers
 
 ## Project Architecture
 

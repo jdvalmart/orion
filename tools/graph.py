@@ -2,8 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -25,9 +24,9 @@ class GraphEdge(BaseModel):
     source_id: int
     target_id: int
     relation: str
-    description: Optional[str] = None
+    description: str | None = None
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(UTC)
     )
 
 
@@ -40,7 +39,7 @@ def _load_edges() -> list[GraphEdge]:
     if not GRAPH_FILE.exists():
         return []
     try:
-        with open(GRAPH_FILE, "r") as f:
+        with open(GRAPH_FILE) as f:
             raw = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to read graph file: %s", exc)
@@ -84,7 +83,7 @@ def link_concepts(
     source_id: int,
     target_id: int,
     relation: str,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> str:
     """Create a relationship between two stored decisions.
 
@@ -107,7 +106,11 @@ def link_concepts(
     edges = _load_edges()
 
     for edge in edges:
-        if edge.source_id == source_id and edge.target_id == target_id and edge.relation == relation:
+        if (
+            edge.source_id == source_id
+            and edge.target_id == target_id
+            and edge.relation == relation
+        ):
             return f"#{source_id} is already {relation} #{target_id}."
 
     edge = GraphEdge(

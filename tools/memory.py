@@ -6,8 +6,7 @@ via sentence-transformer embeddings (all-MiniLM-L6-v2, 384-dim).
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -29,7 +28,7 @@ class MemoryEntry(BaseModel):
     topic: str
     decision: str
     tags: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +41,7 @@ def _load_entries() -> list[MemoryEntry]:
         logger.debug("Memory file not found, returning empty list")
         return []
     try:
-        with open(MEMORY_FILE, "r") as f:
+        with open(MEMORY_FILE) as f:
             raw = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to read memory file: %s", exc)
@@ -76,8 +75,8 @@ def _save_entries(entries: list[MemoryEntry]) -> None:
 # ChromaDB vector store (search index)
 # ---------------------------------------------------------------------------
 
-_chroma_client: "chromadb.PersistentClient | None" = None
-_chroma_collection: "chromadb.Collection | None" = None
+_chroma_client: chromadb.PersistentClient | None = None  # type: ignore[valid-type]
+_chroma_collection: chromadb.Collection | None = None  # type: ignore[valid-type]
 
 
 def _get_chroma_collection():
@@ -89,7 +88,7 @@ def _get_chroma_collection():
             ef = embedding_functions.DefaultEmbeddingFunction()
             _chroma_collection = _chroma_client.get_or_create_collection(
                 name="decisions",
-                embedding_function=ef,
+                embedding_function=ef,  # type: ignore[arg-type]
             )
         except Exception as exc:
             logger.error("Failed to init ChromaDB: %s", exc)
@@ -116,7 +115,7 @@ def _chroma_add(entry: MemoryEntry) -> None:
                 "created_at": entry.created_at.isoformat(),
             }],
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — ChromaDB may raise any error; JSON is the source of truth
         logger.warning("Failed to index entry #%d in ChromaDB: %s", entry.id, exc)
 
 
@@ -125,7 +124,7 @@ def _chroma_delete(entry_id: int) -> None:
     try:
         collection = _get_chroma_collection()
         collection.delete(ids=[str(entry_id)])
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — ChromaDB may raise any error; JSON is the source of truth
         logger.warning("Failed to delete entry #%d from ChromaDB: %s", entry_id, exc)
 
 
@@ -133,7 +132,7 @@ def _chroma_delete(entry_id: int) -> None:
 # Formatting
 # ---------------------------------------------------------------------------
 
-def _format_entry(entry: MemoryEntry, score: Optional[float] = None) -> str:
+def _format_entry(entry: MemoryEntry, score: float | None = None) -> str:
     tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
     prefix = f"#{entry.id} | {entry.topic}{tags_str}"
     if score is not None:
@@ -154,7 +153,7 @@ def _format_entry(entry: MemoryEntry, score: Optional[float] = None) -> str:
 def remember_decision(
     topic: str,
     decision: str,
-    tags: Optional[str] = None,
+    tags: str | None = None,
 ) -> str:
     """Store a development decision or architectural choice for future reference.
 
@@ -209,7 +208,7 @@ def recall_context(query: str, limit: int = 5) -> str:
             query_texts=[query],
             n_results=min(limit, len(entries)),
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — ChromaDB may raise any error; JSON is the source of truth
         logger.error("ChromaDB query failed, falling back to keyword search: %s", exc)
         return _recall_fallback(query, limit)
 
@@ -220,7 +219,7 @@ def recall_context(query: str, limit: int = 5) -> str:
 
     entry_map = {str(e.id): e for e in entries}
     lines: list[str] = []
-    for doc_id, distance in zip(ids, distances):
+    for doc_id, distance in zip(ids, distances, strict=False):
         entry = entry_map.get(doc_id)
         if entry is not None:
             score = 1.0 - (distance / 2.0)  # cosine distance → similarity score
@@ -265,9 +264,9 @@ def _recall_fallback(query: str, limit: int) -> str:
 )
 def revise_decision(
     id: int,
-    topic: Optional[str] = None,
-    decision: Optional[str] = None,
-    tags: Optional[str] = None,
+    topic: str | None = None,
+    decision: str | None = None,
+    tags: str | None = None,
 ) -> str:
     """Update an existing decision. Only provided fields are changed.
 

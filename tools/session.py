@@ -2,8 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -24,7 +23,7 @@ class SessionEntry(BaseModel):
     tags: list[str] = Field(default_factory=list)
     decisions_made: list[int] = Field(default_factory=list)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(UTC)
     )
 
 
@@ -37,7 +36,7 @@ class MasterSession(BaseModel):
     summary: str = ""
     next_steps: str = ""
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(UTC)
     )
 
 
@@ -57,7 +56,7 @@ def _load_store() -> SessionStore:
     if not SESSIONS_FILE.exists():
         return SessionStore()
     try:
-        with open(SESSIONS_FILE, "r") as f:
+        with open(SESSIONS_FILE) as f:
             raw = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to read sessions file: %s", exc)
@@ -97,8 +96,8 @@ def _save_store(store: SessionStore) -> None:
 )
 def remember_session(
     summary: str,
-    tags: Optional[str] = None,
-    decisions_made: Optional[str] = None,
+    tags: str | None = None,
+    decisions_made: str | None = None,
 ) -> str:
     """Save a development session summary and update the master context.
 
@@ -131,7 +130,7 @@ def remember_session(
 
     store.master.total_sessions = len(store.history)
     store.master.summary = summary.strip()
-    store.master.updated_at = datetime.now(timezone.utc)
+    store.master.updated_at = datetime.now(UTC)
 
     _save_store(store)
 
@@ -160,7 +159,10 @@ def recall_session() -> str:
     master = store.master
 
     if master.total_sessions == 0:
-        return "No sessions recorded yet. Start your first session and call remember_session at the end."
+        return (
+            "No sessions recorded yet."
+            " Start your first session and call remember_session at the end."
+        )
 
     recent = store.history[-3:] if len(store.history) >= 3 else store.history
     recent_text = "\n".join(

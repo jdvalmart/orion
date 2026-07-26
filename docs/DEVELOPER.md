@@ -37,7 +37,25 @@ Never run `git commit`, `git add`, `git push`, or any repository mutation. Only 
 - No unnecessary comments. The code explains itself; comments explain *why*, not *what*.
 - FastMCP tools use the `@mcp.tool()` decorator — never the `register_tools(mcp)` wrapper pattern.
 
-## 6. Documentation standards
+## 6. Quality checks (mandatory before commit)
+
+Every change must pass these checks without errors:
+
+```bash
+ruff check .    # linting
+ruff format .   # formatting (applies automatically)
+mypy .          # type checking
+```
+
+Install dev dependencies once:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+No blind exceptions (`except Exception`) unless accompanied by a `# noqa: BLE001` comment explaining why the broad catch is intentional (e.g., ChromaDB fallback).
+
+## 7. Documentation standards
 
 Every module must be documented at the top with a docstring explaining its purpose. Every Pydantic model must have a docstring. Every tool must document all parameters using Google-style Args docstrings. There are no exceptions — undocumented code is unfinished code.
 
