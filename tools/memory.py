@@ -1,20 +1,26 @@
-"""Memory tools — persistent context for AI assistants."""
+"""Memory tools — persistent context for AI assistants.
+
+Phase 2: JSON is the source of truth. ChromaDB provides semantic search
+via sentence-transformer embeddings (all-MiniLM-L6-v2, 384-dim).
+"""
 
 import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-import numpy as np
+import chromadb
+from chromadb.utils import embedding_functions
 from pydantic import BaseModel, Field, ValidationError
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from app import mcp
-from orion_config import MEMORY_FILE
+from orion_config import CHROMA_PATH, MEMORY_FILE
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Domain model
+# ---------------------------------------------------------------------------
 
 class MemoryEntry(BaseModel):
     """A single development decision or architectural choice."""
@@ -26,9 +32,9 @@ class MemoryEntry(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-def _entry_text(entry: MemoryEntry) -> str:
-    return f"{entry.topic} {' '.join(entry.tags)} {entry.decision}"
-
+# ---------------------------------------------------------------------------
+# JSON persistence (source of truth)
+# ---------------------------------------------------------------------------
 
 def _load_entries() -> list[MemoryEntry]:
     """Load all memory entries from disk, validating against the model."""
@@ -66,6 +72,67 @@ def _save_entries(entries: list[MemoryEntry]) -> None:
         raise
 
 
+# ---------------------------------------------------------------------------
+# ChromaDB vector store (search index)
+# ---------------------------------------------------------------------------
+
+_chroma_client: "chromadb.PersistentClient | None" = None
+_chroma_collection: "chromadb.Collection | None" = None
+
+
+def _get_chroma_collection():
+    """Lazy-init ChromaDB with ONNX embedding function (no GPU, no torch)."""
+    global _chroma_client, _chroma_collection
+    if _chroma_client is None:
+        try:
+            _chroma_client = chromadb.PersistentClient(path=str(CHROMA_PATH))
+            ef = embedding_functions.DefaultEmbeddingFunction()
+            _chroma_collection = _chroma_client.get_or_create_collection(
+                name="decisions",
+                embedding_function=ef,
+            )
+        except Exception as exc:
+            logger.error("Failed to init ChromaDB: %s", exc)
+            _chroma_client = None
+            _chroma_collection = None
+            raise
+    return _chroma_collection
+
+
+def _entry_text(entry: MemoryEntry) -> str:
+    return f"{entry.topic} {' '.join(entry.tags)} {entry.decision}"
+
+
+def _chroma_add(entry: MemoryEntry) -> None:
+    """Add a single entry to the vector store."""
+    try:
+        collection = _get_chroma_collection()
+        collection.add(
+            ids=[str(entry.id)],
+            documents=[_entry_text(entry)],
+            metadatas=[{
+                "topic": entry.topic,
+                "tags": ",".join(entry.tags),
+                "created_at": entry.created_at.isoformat(),
+            }],
+        )
+    except Exception as exc:
+        logger.warning("Failed to index entry #%d in ChromaDB: %s", entry.id, exc)
+
+
+def _chroma_delete(entry_id: int) -> None:
+    """Remove a single entry from the vector store."""
+    try:
+        collection = _get_chroma_collection()
+        collection.delete(ids=[str(entry_id)])
+    except Exception as exc:
+        logger.warning("Failed to delete entry #%d from ChromaDB: %s", entry_id, exc)
+
+
+# ---------------------------------------------------------------------------
+# Formatting
+# ---------------------------------------------------------------------------
+
 def _format_entry(entry: MemoryEntry, score: Optional[float] = None) -> str:
     tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
     prefix = f"#{entry.id} | {entry.topic}{tags_str}"
@@ -73,6 +140,10 @@ def _format_entry(entry: MemoryEntry, score: Optional[float] = None) -> str:
         prefix = f"#{entry.id} [{score:.2f}] | {entry.topic}{tags_str}"
     return f"{prefix}\n   {entry.decision}\n"
 
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
 
 @mcp.tool(
     annotations={
@@ -105,6 +176,7 @@ def remember_decision(
 
     entries.append(entry)
     _save_entries(entries)
+    _chroma_add(entry)
 
     logger.info("Stored decision #%d: %s", entry.id, topic)
     return f"Stored decision #{entry.id}: {topic}"
@@ -131,20 +203,58 @@ def recall_context(query: str, limit: int = 5) -> str:
     if not entries:
         return "No memories stored yet."
 
-    corpus = [_entry_text(e) for e in entries]
-    vectorizer = TfidfVectorizer(stop_words=None, lowercase=True)
-    tfidf_matrix = vectorizer.fit_transform(corpus)
-    query_vec = vectorizer.transform([query])
+    try:
+        collection = _get_chroma_collection()
+        results = collection.query(
+            query_texts=[query],
+            n_results=min(limit, len(entries)),
+        )
+    except Exception as exc:
+        logger.error("ChromaDB query failed, falling back to keyword search: %s", exc)
+        return _recall_fallback(query, limit)
 
-    similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
+    ids: list[str] = results.get("ids", [[]])[0]
+    distances: list[float] = results.get("distances", [[]])[0]
+    if not ids:
+        return f"No memories found matching: {query}"
 
-    scored = [(float(similarities[i]), entries[i]) for i in np.argsort(-similarities)]
-    results = [(s, e) for s, e in scored if s > 0][:limit]
+    entry_map = {str(e.id): e for e in entries}
+    lines: list[str] = []
+    for doc_id, distance in zip(ids, distances):
+        entry = entry_map.get(doc_id)
+        if entry is not None:
+            score = 1.0 - (distance / 2.0)  # cosine distance → similarity score
+            lines.append(_format_entry(entry, max(0.0, min(1.0, score))))
+
+    return "\n".join(lines) if lines else f"No memories found matching: {query}"
+
+
+def _recall_fallback(query: str, limit: int) -> str:
+    """Keyword-based fallback search when ChromaDB is unavailable."""
+    entries = _load_entries()
+    query_lower = query.lower()
+    query_words = query_lower.split()
+
+    scored: list[tuple[int, MemoryEntry]] = []
+    for entry in entries:
+        text = (
+            f"{entry.topic.lower()} "
+            f"{entry.decision.lower()} "
+            f"{' '.join(entry.tags).lower()}"
+        )
+        hits = sum(1 for word in query_words if word in text)
+        if hits > 0:
+            scored.append((hits, entry))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    results = scored[:limit]
 
     if not results:
         return f"No memories found matching: {query}"
 
-    return "\n".join(_format_entry(e, s) for s, e in results)
+    return "\n".join(
+        _format_entry(e, float(s)) for s, e in results
+    )
 
 
 @mcp.tool(
@@ -179,6 +289,9 @@ def revise_decision(
                 entry.tags = [t.strip() for t in tags.split(",") if t.strip()]
 
             _save_entries(entries)
+            _chroma_delete(id)
+            _chroma_add(entry)
+
             logger.info("Revised decision #%d", id)
             return f"Revised decision #{id}: {entry.topic}"
 
@@ -204,6 +317,7 @@ def forget_decision(id: int) -> str:
             topic = entry.topic
             entries.pop(i)
             _save_entries(entries)
+            _chroma_delete(id)
             logger.info("Forgot decision #%d: %s", id, topic)
             return f"Forgot decision #{id}: {topic}"
 
