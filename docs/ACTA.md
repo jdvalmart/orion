@@ -1,7 +1,7 @@
 # Orion — Acta de Fundación
 
-**Fecha:** 25 de julio de 2026  
-**Autor:** Juan David Valencia Martínez  
+**Fecha:** 25 de julio de 2026
+**Autor:** Juan David Valencia Martínez
 **Asistente:** OpenCode (deepseek-v4-pro)
 
 ---
@@ -135,7 +135,26 @@ universo/          ← el firmamento (carpeta raíz)
 
 ---
 
-## 7. Arquitectura del proyecto
+## 7. Arquitectura y fases del proyecto
+
+### Estructura del proyecto
+
+```
+orion/
+├── server.py              # CLI entrypoint (argparse + mcp.run())
+├── app.py                 # FastMCP instance + tool registration
+├── tools/
+│   ├── __init__.py
+│   └── memory.py          # remember_decision, recall_context
+├── orion_config.py        # Paths, defaults, logging setup
+├── data/                  # Gitignored, persistent storage
+│   └── memory.json        # Flat JSON decision store
+├── requirements.txt       # fastmcp, pydantic
+├── README.md              # Public documentation
+├── docs/
+│   └── ACTA.md            # This document — founding act + roadmap + rules
+└── .gitignore
+```
 
 ### Transporte dual desde el día 1
 - **stdio**: compatible con Claude Desktop, VS Code, Neovim
@@ -143,7 +162,14 @@ universo/          ← el firmamento (carpeta raíz)
 
 En el trabajo usamos HTTP para multi-usuario. Orion es single-user local pero mantiene ambos transportes para máxima compatibilidad.
 
-### Decisiones de diseño de la Fase 1
+### Herramientas (Fase 1)
+
+| Tool | Input | Output | Lógica |
+|------|-------|--------|--------|
+| `remember_decision` | topic, decision, tags (opt) | Confirmación | Guarda en data/memory.json con timestamp. JSON plano. |
+| `recall_context` | query | Top-N decisiones | Búsqueda por keywords. Fase 2 migra a RAG con embeddings. |
+
+### Decisiones de diseño
 
 | Decisión | Justificación |
 |----------|--------------|
@@ -155,11 +181,12 @@ En el trabajo usamos HTTP para multi-usuario. Orion es single-user local pero ma
 ### Fases del proyecto
 
 ```
-Fase 1 — Fundación (AHORA)
+Fase 1 — Fundación (HECHO)
 ├── Servidor MCP mínimo (FastMCP)
 ├── 2 herramientas: remember_decision, recall_context
 ├── Almacenamiento JSON plano
-└── Búsqueda por keywords
+├── Búsqueda por keywords
+└── Arquitectura profesional: @mcp.tool decorators, Pydantic models, logging
 
 Fase 2 — RAG semántico
 ├── ChromaDB como vector store
@@ -210,7 +237,7 @@ Futuro — Nuevas constelaciones
 
 ## 9. Reglas de trabajo
 
-Estas reglas fueron establecidas en esta sesión y aplican a todo el desarrollo de Orion y del universo:
+Estas reglas fueron establecidas en la sesión fundacional y aplican a todo el desarrollo de Orion y del universo:
 
 ### Regla 1 — Sin commits automáticos (PROHIBIDO)
 
@@ -234,7 +261,7 @@ Antes de tocar cualquier archivo, el asistente debe presentar un plan con:
 
 ### Regla 4 — COMMIT_RULES.md como estándar vivo
 
-Leer `/home/jdvalmart/Documentos/GitHub/COMMIT_RULES.md` al inicio de cada sesión. Si durante el trabajo se identifica una mejora en las reglas (estructura de commits, nuevos tipos, claridad, etc.), proponerla para que el documento evolucione hacia un estándar cada vez más profesional.
+Leer `/home/jdvalmart/Documentos/GitHub/COMMIT_RULES.md` al inicio de cada sesión. Si durante el trabajo se identifica una mejora en las reglas, proponerla para que el documento evolucione.
 
 ### Regla 5 — Comunidad OpenCode
 
@@ -252,11 +279,11 @@ feature/*     ← una rama por feature/fix
 
 Nada de `develop`, `staging`, ni `release/*`. Feature branch → PR → merge a main.
 
-### Pull Requests (aunque trabajes solo)
+### Pull Requests
 
-1. `git checkout -b feature/orion-memory-tools`
+1. `git checkout -b feature/nombre-descriptivo`
 2. Trabajar, commits atómicos
-3. `git push -u origin feature/orion-memory-tools`
+3. `git push -u origin feature/nombre-descriptivo`
 4. `gh pr create --title "..." --body "..."`
 5. `gh pr merge --squash`
 
@@ -289,16 +316,17 @@ Nada de `develop`, `staging`, ni `release/*`. Feature branch → PR → merge a 
 ### Creados (proyecto Orion)
 ```
 universo/orion/
-├── ACTA.md              ← este documento
-├── PLAN.md              ← plan técnico de la Fase 1
-├── README.md            ← documentación de uso
-├── server.py            ← FastMCP entrypoint, dual-transport
-├── orion_config.py      ← configuración centralizada
-├── requirements.txt     ← dependencias
-├── .gitignore
+├── docs/
+│   └── ACTA.md          ← este documento
+├── server.py            ← FastMCP CLI entrypoint
+├── app.py               ← FastMCP instance
 ├── tools/
 │   ├── __init__.py
 │   └── memory.py        ← remember_decision + recall_context
+├── orion_config.py      ← configuración centralizada
+├── requirements.txt     ← dependencias
+├── README.md            ← documentación pública
+├── .gitignore
 └── data/                ← gitignored
 ```
 

@@ -1,25 +1,30 @@
-"""Orion — MCP server for developer context and memory."""
+"""Orion — CLI entrypoint. Run with stdio or HTTP transport."""
 
-from mcp.server.fastmcp import FastMCP
+import argparse
 
-mcp = FastMCP("Orion")
-
-# Tools are registered by importing them
-from tools.memory import register_memory_tools
-
-register_memory_tools(mcp)
+from app import mcp
 
 
-def main():
-    """Run Orion. Defaults to stdio; pass --transport http for HTTP mode."""
-    import sys
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Orion — MCP server for developer memory and context.",
+    )
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="Transport protocol (default: stdio)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=9099,
+        help="HTTP port (default: 9099)",
+    )
+    args = parser.parse_args()
 
-    if "--transport" in sys.argv and "http" in sys.argv:
-        port = 9099
-        if "--port" in sys.argv:
-            port_idx = sys.argv.index("--port")
-            port = int(sys.argv[port_idx + 1])
-        mcp.run(transport="http", port=port)
+    if args.transport == "http":
+        mcp.run(transport="http", port=args.port)
     else:
         mcp.run()
 
