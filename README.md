@@ -2,11 +2,6 @@
 
 MCP server that gives memory, context, and semantic search to AI assistants. First constellation of the universe.
 
-## Transports
-
-- **stdio** — compatible with Claude Desktop, VS Code, Neovim
-- **HTTP** (`localhost:9099`) — compatible with opencode and HTTP clients
-
 ## Installation
 
 ```bash
@@ -15,15 +10,52 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Usage
+## Connect your MCP client
+
+Orion runs as a subprocess. Configure your client to launch it.
+
+### OpenCode
+
+Add to your `.opencode/opencode.jsonc`:
+
+```jsonc
+{
+  "mcp": {
+    "orion": {
+      "type": "local",
+      "command": [".venv/bin/python", "server.py"],
+      "enabled": true
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "orion": {
+      "command": "/path/to/orion/.venv/bin/python",
+      "args": ["/path/to/orion/server.py"]
+    }
+  }
+}
+```
+
+### VS Code / Neovim
+
+Configure your MCP extension to run `python server.py` from the orion directory using stdio transport.
+
+### HTTP mode
 
 ```bash
-# stdio (Claude Desktop, VS Code, Neovim)
-python server.py
-
-# HTTP (opencode, HTTP clients)
 python server.py --transport http --port 9099
 ```
+
+Then connect any HTTP-compatible client to `http://localhost:9099/mcp`.
 
 ## Tools
 
