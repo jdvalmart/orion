@@ -21,10 +21,16 @@ def main() -> None:
         default=9099,
         help="HTTP port (default: 9099)",
     )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="HTTP host (default: 127.0.0.1)",
+    )
     args = parser.parse_args()
 
     if args.transport == "http":
-        mcp.run(transport="http", port=args.port)
+        mcp.run(transport="http", host=args.host, port=args.port)
     else:
         mcp.run()
 

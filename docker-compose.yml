@@ -1,0 +1,20 @@
+services:
+  orion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orion-mcp
+    ports:
+      - "9099:9099"
+    volumes:
+      - orion_data:/app/data
+      - orion_logs:/app/logs
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+    restart: unless-stopped
+
+volumes:
+  orion_data:
+  orion_logs:

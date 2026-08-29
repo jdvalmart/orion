@@ -4,6 +4,8 @@ Phase 2: JSON is the source of truth. ChromaDB provides semantic search
 via sentence-transformer embeddings (all-MiniLM-L6-v2, 384-dim).
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import UTC, datetime
