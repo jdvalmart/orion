@@ -19,19 +19,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi8 \
     openssl \
-    && rm -rf /var/lib/apt/lists/* \
-    && addgroup --gid 1000 --system orion \
-    && adduser --uid 1000 --system --gid 1000 --home /app orion
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 
 COPY server.py app.py orion_config.py .
 COPY tools/ tools/
 
-RUN mkdir -p /app/data /app/logs \
-    && chown -R orion:orion /app
-
-USER 1000:1000
+RUN mkdir -p /app/data /app/logs
 
 EXPOSE 9099
 

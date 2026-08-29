@@ -1,6 +1,7 @@
 """Orion configuration — paths, defaults, and logging setup."""
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -24,25 +25,39 @@ _console = logging.StreamHandler()
 _console.setLevel(logging.INFO)
 _console.setFormatter(_formatter)
 
-_app_log = RotatingFileHandler(
-    LOGS_DIR / "orion.log",
-    maxBytes=1_048_576,  # 1 MB
-    backupCount=3,
-    encoding="utf-8",
-)
-_app_log.setLevel(logging.INFO)
-_app_log.setFormatter(_formatter)
+handlers = [_console]
 
-_error_log = RotatingFileHandler(
-    LOGS_DIR / "errors.log",
-    maxBytes=1_048_576,  # 1 MB
-    backupCount=3,
-    encoding="utf-8",
-)
-_error_log.setLevel(logging.WARNING)
-_error_log.setFormatter(_formatter)
+# Try to add file handlers, but don't fail if permission denied
+# (e.g., when running stdio locally while container owns the files)
+try:
+    _app_log = RotatingFileHandler(
+        LOGS_DIR / "orion.log",
+        maxBytes=1_048_576,
+        backupCount=3,
+        encoding="utf-8",
+        delay=True,  # Don't open file until first log
+    )
+    _app_log.setLevel(logging.INFO)
+    _app_log.setFormatter(_formatter)
+    handlers.append(_app_log)
+except (PermissionError, OSError):
+    pass
+
+try:
+    _error_log = RotatingFileHandler(
+        LOGS_DIR / "errors.log",
+        maxBytes=1_048_576,
+        backupCount=3,
+        encoding="utf-8",
+        delay=True,
+    )
+    _error_log.setLevel(logging.WARNING)
+    _error_log.setFormatter(_formatter)
+    handlers.append(_error_log)
+except (PermissionError, OSError):
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[_console, _app_log, _error_log],
+    handlers=handlers,
 )
