@@ -5,33 +5,31 @@ Update it at the end of each session.
 
 ## Current Status
 
-- **Phase**: Fase 4 — Session Memory (DONE)
-- **Phase 1**: Foundation — 6 memory tools + whoami (DONE)
-- **Phase 2**: RAG — ChromaDB ONNX embeddings (DONE)
-- **Phase 3**: Knowledge Graph — link, find, browse (DONE)
-- **Phase 4**: Session Memory — hybrid architecture (DONE)
-- **Total tools**: 12
-- **Next**: Lupus (test suite) — already bootstrapped, 36 tests, 5 layers
+- **Version**: 5.0.0 — SQLite storage, per-project memory (DONE)
+- **Phases 1–4**: Foundation, RAG, Knowledge Graph, Session Memory (DONE)
+- **Phase 5**: Hardening — single SQLite store (WAL, FTS5, optional sqlite-vec),
+  projects, structured output, HTTP token auth, config-only S3 bucket, tests (DONE)
+- **Total tools**: 15 (+2 S3 tools when `ORION_S3_BUCKET` is set)
+- **Data**: `~/.local/share/orion/orion.db` — legacy JSON migrated, test pollution quarantined
+- **Next**: optional — enable semantic search in Lupus runs; CI workflow for orion + lupus
 
 ## Project Architecture
 
 ```
 orion/
-├── server.py           # CLI entrypoint (argparse + mcp.run())
-├── app.py              # FastMCP instance + tool registration
-├── tools/
-│   ├── memory.py       # remember, recall, revise, forget, browse_memories
-│   ├── whoami.py       # Juan's professional profile
-│   ├── graph.py        # link_concepts, find_related, browse_graph
-│   └── session.py      # remember_session, recall_session, browse_sessions
-├── orion_config.py     # Paths, logging, ChromaDB config
-├── data/               # Persistent storage (gitignored)
-├── logs/               # Runtime diagnostics (gitignored)
-├── docs/
-│   ├── ACTA.md         # Founding act + roadmap
-│   ├── DEVELOPER.md    # AI assistant rules
-│   └── SESSION_CONTEXT.md  # This file
-└── requirements.txt
+├── src/orion/
+│   ├── server.py       # CLI entrypoint (`orion`), transports, HTTP auth
+│   ├── app.py          # FastMCP instance + instructions + tool registration
+│   ├── config.py       # ORION_* environment settings, logging
+│   ├── db.py           # SQLite connections, transactions, migrations
+│   ├── store.py        # All reads/writes (memories, graph, sessions, profile)
+│   ├── semantic.py     # Optional embeddings (fastembed + sqlite-vec)
+│   ├── projects.py     # Project resolution
+│   ├── models.py       # Pydantic output models
+│   └── tools/          # memory, graph, session, profile, admin, backup
+├── scripts/            # clean_test_data.py, migrate_json_to_sqlite.py
+├── tests/              # pytest — always against a temp data dir
+└── docs/
 ```
 
 ## Development Rules
@@ -42,6 +40,7 @@ document every module and model.
 
 ## Connection
 
-- **OpenCode Desktop/TUI**: reads `~/.config/opencode/opencode.json` (global)
-- **Claude Desktop**: configure `claude_desktop_config.json` to run `server.py`
-- **HTTP mode**: `curl -X POST http://localhost:9099/mcp`
+- **Command for every stdio client**: `/home/jdvalmart/Proyectos/universo/orion/.venv/bin/orion`
+- **OpenCode**: `"orion": {"type": "local", "command": ["<path>/.venv/bin/orion"]}`
+- **Claude Desktop / Claude Code**: `"command": "<path>/.venv/bin/orion"` (no args)
+- **HTTP mode**: `ORION_TOKEN=... orion --transport http` — bearer token required off-loopback

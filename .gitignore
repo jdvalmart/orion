@@ -1,11 +1,16 @@
 # Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 
-# Data (persistent storage)
+# Legacy JSON data and backups (live data now lives in ~/.local/share/orion)
 data/
+data.bak-*/
 
 # Logs (runtime diagnostics)
 logs/

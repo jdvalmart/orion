@@ -42,45 +42,50 @@ Never run `git commit`, `git add`, `git push`, or any repository mutation. Only 
 Every change must pass these checks without errors:
 
 ```bash
-ruff check .    # linting
-ruff format .   # formatting (applies automatically)
-mypy .          # type checking
+ruff check src tests scripts   # linting
+ruff format src tests scripts  # formatting (applies automatically)
+mypy                           # type checking (configured in pyproject.toml)
+pytest -q                      # tests — always against a temp data dir, never real data
 ```
 
-Install dev dependencies once:
+Install the package with every extra once:
 
 ```bash
-pip install -r requirements-dev.txt
+uv pip install -e '.[semantic,s3,dev]'
 ```
 
-No blind exceptions (`except Exception`) unless accompanied by a `# noqa: BLE001` comment explaining why the broad catch is intentional (e.g., ChromaDB fallback).
+No blind exceptions (`except Exception`) unless accompanied by a `# noqa: BLE001` comment explaining why the broad catch is intentional (e.g., embedding failures, where keyword search must keep working).
 
 ## 7. Documentation standards
 
 Every module must be documented at the top with a docstring explaining its purpose. Every Pydantic model must have a docstring. Every tool must document all parameters using Google-style Args docstrings. There are no exceptions — undocumented code is unfinished code.
 
-## 7. Architecture boundaries
+## 8. Architecture boundaries
 
-- `app.py` — FastMCP instance only. Tool imports trigger `@mcp.tool()` decorator side-effects.
-- `server.py` — CLI entrypoint only. `argparse` + `mcp.run()`.
-- `tools/` — tool implementations. One file per tool group. Imports `mcp` from `app`.
-- `data/` — persistent storage. Gitignored. JSON flat files in Phase 1.
-- `logs/` — runtime diagnostics. Gitignored. Rotated via `RotatingFileHandler`.
-- `orion_config.py` — paths, constants, logging setup. No business logic.
+- `src/orion/app.py` — FastMCP instance and instructions. Tool imports register tools.
+- `src/orion/server.py` — CLI entrypoint (`orion`). Transport selection and HTTP auth.
+- `src/orion/tools/` — thin async MCP wrappers, one file per tool group. No SQL here.
+- `src/orion/store.py` — all reads and writes. Pure functions over SQLite, testable without MCP.
+- `src/orion/db.py` — connections, transactions (`writing()` / `reading()`), schema migrations.
+- `src/orion/semantic.py` — optional embeddings (fastembed + sqlite-vec). Must degrade to no-op.
+- `src/orion/projects.py` — project resolution (argument → env → MCP roots → git cwd → general).
+- `src/orion/config.py` — environment settings and logging. No business logic.
+- Data lives in `$ORION_DATA_DIR` (default `~/.local/share/orion`), never inside the repo.
+- Schema changes are new entries in `db.MIGRATIONS`; never edit an applied migration.
 
-## 8. Session workflow
+## 9. Session workflow
 
 Every session must follow this pattern to maintain context across restarts:
 
 **At the START of every session:**
 1. Read `docs/SESSION_CONTEXT.md` (injected automatically by opencode `instructions` config).
-2. Call `recall_session` via Orion to get the accumulated master context and recent history.
+2. Call `recall_session` via Orion to get the project's phase, next steps and recent history.
 
 **At the END of every session:**
-1. Call `remember_session` with a concise summary of what was accomplished.
+1. Call `remember_session` with a concise summary, `next_steps` and, if it changed, `phase`.
 2. Update `docs/SESSION_CONTEXT.md` to reflect the new phase, tool count, and next steps.
 
-## 9. Documentation files
+## 10. Documentation files
 
 - `README.md` — public: install, usage, connection guide.
 - `docs/ACTA.md` — single internal document: founding context, architecture, roadmap, work rules, git workflow.
