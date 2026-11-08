@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot the Orion memory database
+
+[Service]
+Type=oneshot
+# Adjust the path if the repository lives elsewhere.
+ExecStart=%h/Proyectos/universo/orion/.venv/bin/orion-backup --keep 12
+Nice=10

@@ -27,6 +27,7 @@ dev = [
 
 [project.scripts]
 orion = "orion.server:main"
+orion-backup = "orion.backup_local:main"
 
 [build-system]
 requires = ["hatchling>=1.24"]

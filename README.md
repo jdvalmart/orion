@@ -136,6 +136,21 @@ flowchart LR
 - **Vectors are derived data.** Any memory missing a vector is re-embedded on the next search.
 - **Soft deletes.** Forgotten decisions keep their id; their relationships are removed.
 
+## Backups
+
+Local monthly snapshots (SQLite online backup, safe while clients write), keeping 12:
+
+```bash
+cp deploy/systemd/orion-backup.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now orion-backup.timer   # 1st of each month; catches up after boot
+systemctl --user list-timers orion-backup.timer     # next run
+.venv/bin/orion-backup                              # manual snapshot
+```
+
+Snapshots live in `$ORION_DATA_DIR/backups/snapshots/`. To restore one, stop the clients and
+copy it over `orion.db`.
+
 ## Migrating from the JSON store (v4)
 
 ```bash

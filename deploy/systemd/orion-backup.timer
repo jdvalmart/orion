@@ -1,0 +1,12 @@
+[Unit]
+Description=Monthly snapshot of the Orion memory database
+
+[Timer]
+# 1st day of every month at 00:00, plus up to 1h of random delay.
+OnCalendar=monthly
+RandomizedDelaySec=1h
+# If the PC was off at that moment, run at the next boot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

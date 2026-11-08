@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  orion:
+    name: Orion (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: uv venv && uv pip install -e ".[s3,dev]"
+      - name: Ruff
+        run: |
+          .venv/bin/ruff check src tests scripts
+          .venv/bin/ruff format --check src tests scripts
+      - name: Mypy
+        run: .venv/bin/mypy
+      - name: Pytest
+        run: .venv/bin/pytest -q
+
+  lupus:
+    # Black-box suite: launches this Orion over HTTP in an isolated data dir.
+    name: Lupus against Orion
+    runs-on: ubuntu-latest
+    needs: orion
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orion
+      - uses: actions/checkout@v4
+        with:
+          repository: jdvalmart/lupus
+          path: lupus
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install Orion
+        working-directory: orion
+        run: uv venv && uv pip install -e .
+      - name: Install Lupus
+        working-directory: lupus
+        run: uv venv && uv pip install -e .
+      - name: Test layers
+        working-directory: lupus
+        run: .venv/bin/python lupus_cli.py run -q
+      - name: Adversarial run (built-in corpus)
+        working-directory: lupus
+        run: .venv/bin/python lupus_cli.py attack
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupus-reports
+          path: |
+            lupus/TEST_REPORT.md
+            lupus/QA_REPORT.md
+          if-no-files-found: ignore
